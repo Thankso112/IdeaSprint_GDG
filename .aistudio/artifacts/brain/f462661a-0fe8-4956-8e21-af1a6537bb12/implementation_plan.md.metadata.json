@@ -1,0 +1,6 @@
+{
+  "summary": "Implementation plan for adding structured pickup time slots (Morning, Afternoon, Evening with 30-min duration and 30-min intervals) and an Immediate/Urgent emergency contact option with priority badges to FoodBridge's surplus food posting and listing views.",
+  "updatedAt": "2026-10-15T06:37:51.443849380Z",
+  "requestFeedback": true,
+  "userFacing": true
+}
