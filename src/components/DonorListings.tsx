@@ -7,20 +7,25 @@ import {
   CheckCircle2, 
   Phone, 
   AlertCircle, 
-  ShieldCheck,
-  Plus,
-  KeyRound,
-  Check,
-  Star,
-  Award,
-  Sparkles,
-  BellRing,
-  XCircle,
-  Utensils
+  ShieldCheck, 
+  Plus, 
+  KeyRound, 
+  Check, 
+  Star, 
+  Award, 
+  Sparkles, 
+  BellRing, 
+  XCircle, 
+  Utensils,
+  QrCode,
+  Maximize2,
+  ScanLine
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import QRCode from 'qrcode';
 import { FoodListing } from '../types';
 import { calculateHoursRemaining } from '../services/geminiService';
+import { DonorPickupQRModal } from './DonorPickupQRModal';
 
 interface DonorListingsProps {
   listings: FoodListing[];
@@ -47,6 +52,45 @@ export const DonorListings: React.FC<DonorListingsProps> = ({
   const [verificationCodes, setVerificationCodes] = useState<Record<string, string>>({});
   const [verificationErrors, setVerificationErrors] = useState<Record<string, string>>({});
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
+
+  // QR Code generator state for claimed listings
+  const [activeQrListing, setActiveQrListing] = useState<FoodListing | null>(null);
+  const [qrThumbnails, setQrThumbnails] = useState<Record<string, string>>({});
+
+  // Generate QR code data URLs for claimed listings
+  useEffect(() => {
+    listings.forEach((listing) => {
+      if (listing.status === 'claimed' && !qrThumbnails[listing.id]) {
+        const payload = JSON.stringify({
+          app: 'foodbridge',
+          type: 'pickup_verification',
+          listingId: listing.id,
+          pickupCode: listing.pickupCode || '4829',
+          foodName: listing.foodName,
+          donorName: listing.donorName,
+          servings: listing.claimedServings || listing.servings,
+          pickupAddress: listing.pickupAddress,
+          generatedAt: Date.now(),
+        });
+
+        QRCode.toDataURL(payload, {
+          width: 240,
+          margin: 1,
+          color: {
+            dark: '#042f2e',
+            light: '#ffffff',
+          },
+          errorCorrectionLevel: 'M',
+        })
+          .then((url) => {
+            setQrThumbnails((prev) => ({ ...prev, [listing.id]: url }));
+          })
+          .catch((err) => {
+            console.error('Error generating inline QR code', err);
+          });
+      }
+    });
+  }, [listings, qrThumbnails]);
 
   // Live timer for 2-minute countdown
   const [, setTick] = useState(0);
@@ -408,25 +452,79 @@ export const DonorListings: React.FC<DonorListingsProps> = ({
                       </div>
                     )}
 
-                    {/* CLAIMED STATE: 4-DIGIT VERIFICATION INPUT */}
+                    {/* CLAIMED STATE: DUAL QR CODE GENERATION & 4-DIGIT PIN VERIFICATION */}
                     {listing.status === 'claimed' && (
-                      <div className="mt-3 p-4 rounded-2xl bg-amber-50/80 border-2 border-amber-300 text-xs space-y-3">
+                      <div className="mt-3 p-4 rounded-2xl bg-gradient-to-br from-amber-50/90 to-emerald-50/70 border-2 border-amber-300 text-xs space-y-3.5">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <p className="font-bold text-amber-950 flex items-center gap-1 text-sm">
-                              <KeyRound className="w-4 h-4 text-amber-600" />
-                              <span>Verify Driver Pickup Code</span>
+                            <p className="font-extrabold text-amber-950 flex items-center gap-1.5 text-sm">
+                              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                              <span>Handover Verification</span>
                             </p>
-                            <p className="text-amber-800/80 text-[11px] mt-0.5">
-                              Claimed by {listing.claimedBy?.name} ({listing.claimedBy?.organization || 'Volunteer Shelter'}).
+                            <p className="text-amber-900/80 text-[11px] mt-0.5">
+                              Claimed by <strong>{listing.claimedBy?.name}</strong> ({listing.claimedBy?.organization || 'Volunteer Shelter'}).
                             </p>
+                          </div>
+
+                          <span className="bg-emerald-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
+                            <QrCode className="w-3 h-3" />
+                            QR Ready
+                          </span>
+                        </div>
+
+                        {/* QR CODE GENERATION CARD */}
+                        <div className="bg-white p-3 rounded-2xl border border-emerald-200/80 shadow-xs flex flex-col sm:flex-row items-center gap-3">
+                          {/* QR Thumbnail */}
+                          <div 
+                            onClick={() => setActiveQrListing(listing)}
+                            className="relative w-24 h-24 bg-stone-50 rounded-xl p-1.5 border border-stone-200 shadow-2xs shrink-0 cursor-pointer group/qr hover:border-emerald-500 transition"
+                            title="Click to enlarge and download full QR code pass"
+                          >
+                            {qrThumbnails[listing.id] ? (
+                              <img
+                                src={qrThumbnails[listing.id]}
+                                alt="Pickup Handover QR"
+                                className="w-full h-full object-contain rounded"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-stone-400">
+                                <QrCode className="w-8 h-8 animate-pulse text-emerald-600" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-emerald-950/40 rounded-xl opacity-0 group-hover/qr:opacity-100 flex items-center justify-center transition text-white">
+                              <Maximize2 className="w-5 h-5 drop-shadow" />
+                            </div>
+                          </div>
+
+                          {/* QR Instructions and Action */}
+                          <div className="flex-1 text-center sm:text-left space-y-1">
+                            <div className="flex items-center justify-center sm:justify-start gap-1 text-emerald-900 font-extrabold text-xs">
+                              <ScanLine className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Receiver Scans This QR</span>
+                            </div>
+                            <p className="text-[11px] text-stone-600 leading-tight">
+                              Display this QR to the driver. When they scan it with their app, this pickup will be automatically verified!
+                            </p>
+                            <div className="pt-1 flex items-center justify-center sm:justify-start gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setActiveQrListing(listing)}
+                                className="px-2.5 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 font-bold text-[11px] flex items-center gap-1 transition"
+                              >
+                                <Maximize2 className="w-3 h-3 text-emerald-700" />
+                                <span>Show Fullscreen QR</span>
+                              </button>
+                              <span className="text-[10px] font-mono text-stone-400">
+                                PIN: <strong className="text-stone-700">{listing.pickupCode || '4829'}</strong>
+                              </span>
+                            </div>
                           </div>
                         </div>
 
-                        {/* Code Verification Input Group */}
-                        <div>
+                        {/* PIN BACKUP CODE ENTRY */}
+                        <div className="pt-1 border-t border-amber-200/80">
                           <label className="block text-[11px] font-bold text-stone-700 mb-1">
-                            Enter 4-Digit Pickup Code from Receiver's App:
+                            Or Enter 4-Digit Pickup PIN Manually:
                           </label>
                           <div className="flex items-center gap-2">
                             <input
@@ -440,10 +538,10 @@ export const DonorListings: React.FC<DonorListingsProps> = ({
                             <button
                               type="button"
                               onClick={() => handleVerifySubmit(listing)}
-                              className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 font-bold text-white text-xs shadow-md shadow-emerald-700/20 transition flex items-center justify-center gap-1.5"
+                              className="flex-1 py-2 px-3 rounded-xl bg-stone-900 hover:bg-black font-bold text-white text-xs shadow-md transition flex items-center justify-center gap-1.5"
                             >
-                              <CheckCircle2 className="w-4 h-4" />
-                              <span>Confirm Handover</span>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>Confirm PIN</span>
                             </button>
                           </div>
 
@@ -514,6 +612,13 @@ export const DonorListings: React.FC<DonorListingsProps> = ({
           })}
         </div>
       )}
+
+      {/* Donor Handover QR Code Enlarge Pass Modal */}
+      <DonorPickupQRModal
+        isOpen={!!activeQrListing}
+        onClose={() => setActiveQrListing(null)}
+        listing={activeQrListing}
+      />
     </div>
   );
 };

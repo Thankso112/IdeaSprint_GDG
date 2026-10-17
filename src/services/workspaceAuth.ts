@@ -1,17 +1,33 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
+import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { 
   getAuth, 
   signInWithPopup, 
   GoogleAuthProvider, 
   onAuthStateChanged, 
   User,
-  signOut 
+  signOut,
+  Auth
 } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 
-// Initialize Firebase App safely (singleton)
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const auth = getAuth(app);
+// Obtain API key strictly from environment variable or local config (never hardcoded)
+const effectiveApiKey =
+  import.meta.env.VITE_FIREBASE_API_KEY ||
+  (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'YOUR_FIREBASE_API_KEY' ? firebaseConfig.apiKey : '');
+
+let app: FirebaseApp | null = null;
+let authInstance: Auth | null = null;
+
+if (effectiveApiKey) {
+  try {
+    app = getApps().length === 0 ? initializeApp({ ...firebaseConfig, apiKey: effectiveApiKey }) : getApp();
+    authInstance = getAuth(app);
+  } catch (err) {
+    console.warn('Firebase initialization notice:', err);
+  }
+}
+
+export const auth = authInstance;
 
 // Google Workspace Scopes
 export const WORKSPACE_SCOPES = [
@@ -37,6 +53,10 @@ export const initAuth = (
   onAuthSuccess?: (user: User, token: string | null) => void,
   onAuthFailure?: () => void
 ) => {
+  if (!auth) {
+    if (onAuthFailure) onAuthFailure();
+    return () => {};
+  }
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
       if (cachedAccessToken) {
@@ -54,6 +74,9 @@ export const initAuth = (
 
 // Must be called from a user interaction (button click)
 export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
+  if (!auth) {
+    throw new Error('Firebase Auth is not initialized. Please set VITE_FIREBASE_API_KEY in your environment to use Google Workspace sign-in.');
+  }
   try {
     isSigningIn = true;
     const result = await signInWithPopup(auth, provider);
@@ -81,6 +104,8 @@ export const setAccessToken = (token: string | null) => {
 };
 
 export const logout = async () => {
-  await signOut(auth);
+  if (auth) {
+    await signOut(auth);
+  }
   cachedAccessToken = null;
 };

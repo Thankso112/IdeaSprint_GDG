@@ -24,9 +24,10 @@ import {
 } from 'lucide-react';
 import { FoodListing, LocationCoordinates } from '../types';
 import { calculateHoursRemaining } from '../services/geminiService';
+import { FoodMap } from './FoodMap';
 
 const GOOGLE_MAPS_API_KEY =
-  import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyDYNYEPtq3U2uOyO_yh76xHyDfcYDaDMvQ';
+  import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
 interface GoogleFoodMapProps {
   listings: FoodListing[];
@@ -77,6 +78,21 @@ export const GoogleFoodMap: React.FC<GoogleFoodMapProps> = ({
   }, [selectedListingId, listings]);
 
   const availableListings = listings.filter((l) => l.status === 'available');
+
+  // Fallback to OpenStreetMap/Leaflet if no Google Maps API key is provided
+  if (!GOOGLE_MAPS_API_KEY) {
+    return (
+      <div className="relative w-full h-full min-h-[420px] rounded-3xl overflow-hidden shadow-sm border border-stone-200">
+        <FoodMap
+          listings={listings}
+          userLocation={userLocation}
+          selectedListingId={selectedListingId}
+          onSelectListing={onSelectListing}
+          onClaimListing={onClaimListing}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-full min-h-[420px] rounded-3xl overflow-hidden shadow-sm border border-stone-200">

@@ -1,8 +1,9 @@
 {
   "projectId": "gen-lang-client-0788079860",
   "appId": "1:651325571348:web:ca286b2d4badb499d20201",
-  "apiKey": "AIzaSyDDhxQolFEEKDS-93msWTJrz8CvuXGHbos",
+  "apiKey": "",
   "authDomain": "gen-lang-client-0788079860.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-foodbridgehyperl-f462661a-0fe8-4956-8e21-af1a6537bb12",
   "storageBucket": "gen-lang-client-0788079860.firebasestorage.app",
   "messagingSenderId": "651325571348",
   "measurementId": "",

@@ -634,6 +634,7 @@ export default function App() {
             claimedListings={claimedListings}
             pendingListings={pendingRequestsList}
             onMarkPickedUp={handleMarkPickedUp}
+            onVerifyPickup={handleVerifyPickup}
             onBrowseAvailable={() => setActiveTab('receiver-feed')}
             onOpenRating={(listing) => {
               setRatingListing(listing);

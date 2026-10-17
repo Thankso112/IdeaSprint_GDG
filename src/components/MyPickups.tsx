@@ -14,16 +14,21 @@ import {
   Sparkles,
   Award,
   PhoneCall,
-  AlertOctagon
+  AlertOctagon,
+  Camera,
+  QrCode,
+  ScanLine
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { FoodListing } from '../types';
 import { calculateHoursRemaining } from '../services/geminiService';
+import { PickupQRScannerModal } from './PickupQRScannerModal';
 
 interface MyPickupsProps {
   claimedListings: FoodListing[];
   pendingListings?: FoodListing[];
   onMarkPickedUp: (listingId: string) => void;
+  onVerifyPickup?: (listingId: string, inputCode: string) => boolean;
   onBrowseAvailable: () => void;
   onOpenRating: (listing: FoodListing) => void;
   onSimulateDonorAccept?: (listingId: string) => void;
@@ -35,6 +40,7 @@ export const MyPickups: React.FC<MyPickupsProps> = ({
   claimedListings,
   pendingListings = [],
   onMarkPickedUp,
+  onVerifyPickup,
   onBrowseAvailable,
   onOpenRating,
   onSimulateDonorAccept,
@@ -42,6 +48,29 @@ export const MyPickups: React.FC<MyPickupsProps> = ({
   onCancelPendingRequest,
 }) => {
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [scannerTargetListing, setScannerTargetListing] = useState<FoodListing | null>(null);
+
+  const handleValidateFromQR = (listingId: string, pickupCode: string): boolean => {
+    const target = claimedListings.find((l) => l.id === listingId);
+    if (!target) return false;
+
+    let success = false;
+    if (onVerifyPickup) {
+      success = onVerifyPickup(listingId, pickupCode);
+    } else {
+      onMarkPickedUp(listingId);
+      success = true;
+    }
+
+    if (success) {
+      setTimeout(() => {
+        onOpenRating(target);
+      }, 1500);
+    }
+
+    return success;
+  };
 
   // Live timer for 2-minute countdown
   const [, setTick] = useState(0);
@@ -94,12 +123,28 @@ export const MyPickups: React.FC<MyPickupsProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={onBrowseAvailable}
-          className="self-start sm:self-auto px-4 py-2 rounded-xl border border-stone-200 hover:bg-stone-100 text-xs sm:text-sm font-bold text-stone-700 transition"
-        >
-          + Request More Food
-        </button>
+        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          {activePickups.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setScannerTargetListing(null);
+                setIsScannerOpen(true);
+              }}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs sm:text-sm font-bold shadow-md shadow-emerald-700/20 flex items-center gap-1.5 transition"
+            >
+              <Camera className="w-4 h-4" />
+              <span>Scan Donor QR</span>
+            </button>
+          )}
+
+          <button
+            onClick={onBrowseAvailable}
+            className="px-4 py-2 rounded-xl border border-stone-200 hover:bg-stone-100 text-xs sm:text-sm font-bold text-stone-700 transition"
+          >
+            + Request More Food
+          </button>
+        </div>
       </div>
 
       {/* PENDING APPROVAL REQUESTS (2-MINUTE ACCEPT PROTOCOL) */}
@@ -333,6 +378,24 @@ export const MyPickups: React.FC<MyPickupsProps> = ({
                       </p>
                     </div>
 
+                    {/* INSTANT SCANNER ACTION */}
+                    <div className="mb-3.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setScannerTargetListing(listing);
+                          setIsScannerOpen(true);
+                        }}
+                        className="w-full py-2.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-xs shadow-md shadow-emerald-700/25 flex items-center justify-center gap-2 transition group"
+                      >
+                        <Camera className="w-4 h-4 text-emerald-200 group-hover:scale-110 transition" />
+                        <span>Scan Donor QR to Auto-Verify Pickup</span>
+                        <span className="bg-white/20 text-[10px] font-black px-1.5 py-0.5 rounded">
+                          Instant
+                        </span>
+                      </button>
+                    </div>
+
                     {/* Emergency Hotline call banner if urgent */}
                     {listing.isEmergency && (
                       <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-300 flex items-center justify-between text-xs mb-3 animate-pulse">
@@ -376,24 +439,37 @@ export const MyPickups: React.FC<MyPickupsProps> = ({
                     </div>
                   </div>
 
-                  {/* Actions: Navigation & Mark Picked Up */}
+                  {/* Actions: Navigation & Scan QR & Manual Mark Picked Up */}
                   <div className="flex items-center gap-2 pt-2 border-t border-stone-100">
                     <a
                       href={`https://www.google.com/maps/dir/?api=1&destination=${listing.location.lat},${listing.location.lng}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 py-2.5 px-3 rounded-xl border border-stone-200 hover:bg-stone-50 font-bold text-xs text-stone-700 flex items-center justify-center gap-1.5 transition text-center"
+                      className="flex-1 py-2 px-2.5 rounded-xl border border-stone-200 hover:bg-stone-50 font-bold text-xs text-stone-700 flex items-center justify-center gap-1 transition text-center"
                     >
                       <Navigation className="w-3.5 h-3.5 text-emerald-600" />
                       <span>Directions</span>
                     </a>
 
                     <button
-                      onClick={() => handleCompletePickup(listing)}
-                      className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 font-bold text-xs text-white flex items-center justify-center gap-1.5 transition shadow-sm"
+                      type="button"
+                      onClick={() => {
+                        setScannerTargetListing(listing);
+                        setIsScannerOpen(true);
+                      }}
+                      className="flex-1 py-2 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 font-bold text-xs text-white flex items-center justify-center gap-1 transition shadow-sm"
                     >
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>Mark Picked Up</span>
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>Scan QR</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleCompletePickup(listing)}
+                      className="py-2 px-2.5 rounded-xl border border-stone-200 hover:bg-stone-100 font-medium text-xs text-stone-600 transition"
+                      title="Manual fallback without scanning"
+                    >
+                      Manual
                     </button>
                   </div>
                 </div>
@@ -461,6 +537,18 @@ export const MyPickups: React.FC<MyPickupsProps> = ({
           </div>
         </div>
       )}
+
+      {/* Receiver QR Scanner Reader Modal */}
+      <PickupQRScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => {
+          setIsScannerOpen(false);
+          setScannerTargetListing(null);
+        }}
+        targetListing={scannerTargetListing}
+        claimedListings={activePickups}
+        onValidatePickup={handleValidateFromQR}
+      />
     </div>
   );
 };
